@@ -1,0 +1,5 @@
+.build/
+CodexUsage.app/
+CodexUsage.iconset/
+Resources/AppIcon.icns
+.DS_Store
