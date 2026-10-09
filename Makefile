@@ -31,6 +31,7 @@ install: app
 	@rm -rf "$(HOME)/Applications/$(APP)"
 	@cp -R "$(APP)" "$(HOME)/Applications/$(APP)"
 	@echo "Installed $(HOME)/Applications/$(APP) - launch 'Codex Usage' from Alfred"
+	@rm -rf ./$(APP)
 
 icon:
 	swift Scripts/MakeIcon.swift CodexUsage.iconset
