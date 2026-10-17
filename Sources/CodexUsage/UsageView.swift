@@ -15,13 +15,19 @@ struct UsageView: View {
                 content
             }
         }
+        .font(.system(size: 13))
+        .foregroundStyle(Palette.text)
         .frame(minWidth: 340, maxWidth: 460)
+        .background(Palette.background.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .tint(Palette.green)
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 header
+                    .padding(.bottom, 6)
                 if let warning = model.softWarning {
                     warningBanner(warning)
                 }
@@ -30,11 +36,11 @@ struct UsageView: View {
                     if let additional = usage.additionalRateLimits, !additional.isEmpty {
                         additionalLimitsSection(additional)
                     }
-                    if let models = usage.modelUsage, !models.isEmpty {
-                        modelsSection(models)
-                    }
                     if let credits = usage.credits, credits.hasCredits {
                         creditsCard(credits)
+                    }
+                    if let models = usage.modelUsage, !models.isEmpty {
+                        modelsSection(models)
                     }
                     resetCreditsCard(usage)
                     if let limit = usage.spendControl?.individualLimit ?? usage.rateLimit?.individualLimit {
@@ -43,176 +49,157 @@ struct UsageView: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 8)
-            Divider()
-            footer
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            VStack(spacing: 12) {
+                Divider().overlay(Palette.border)
+                footer
+            }
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(20)
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            if let email = model.usage?.email {
-                Text(email)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Overview")
+                    .font(.system(size: 21, weight: .medium))
+                if let email = model.usage?.email {
+                    Text(email)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 0)
             if let plan = model.usage?.planType {
-                planPill(plan)
+                Text(PlanNames.display(plan))
+                    .font(.system(size: 11, weight: .medium))
+                    .fixedSize()
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Palette.raised, in: RoundedRectangle(cornerRadius: 5))
+                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Palette.border))
             }
         }
-    }
-
-    private func planPill(_ plan: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 10, weight: .semibold))
-            Text(PlanNames.display(plan))
-                .font(.caption.weight(.semibold))
-                .kerning(0.2)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color.accentColor.opacity(0.14), in: Capsule())
-        .overlay(Capsule().stroke(Color.accentColor.opacity(0.18), lineWidth: 1))
-        .foregroundStyle(Color.accentColor)
     }
 
     private func warningBanner(_ message: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption)
+            Image(systemName: "exclamationmark.triangle")
                 .padding(.top, 1)
             Text(message)
-                .font(.caption)
                 .lineLimit(3)
                 .textSelection(.enabled)
         }
-        .foregroundStyle(.orange)
-        .padding(11)
+        .font(.system(size: 12))
+        .foregroundStyle(Palette.orange)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: Metric.cardRadius, style: .continuous))
+        .background(Palette.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: Metric.cardRadius))
+        .overlay(RoundedRectangle(cornerRadius: Metric.cardRadius).strokeBorder(Palette.orange.opacity(0.2)))
     }
 
     @ViewBuilder
     private func rateLimitSection(_ usage: UsageResponse) -> some View {
         let rateLimit = usage.rateLimit
-        let heroWindow = rateLimit?.primaryWindow ?? rateLimit?.secondaryWindow
-        if let heroWindow {
+        if let window = rateLimit?.primaryWindow ?? rateLimit?.secondaryWindow {
             Card {
-                HStack(spacing: 16) {
-                    RingView(fraction: remainingFraction(heroWindow), size: 76, lineWidth: 5.5) {
-                        VStack(spacing: 1) {
-                            Text("\(Int((100 - heroWindow.usedPercent).rounded()))%")
-                                .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                            Text("left")
-                                .font(.system(size: 9, weight: .semibold))
-                                .kerning(0.3)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    heroWindowDetails(heroWindow, rateLimit: rateLimit)
-                    Spacer(minLength: 0)
+                HStack {
+                    SectionTitle(text: "\(WindowLabels.length(window.limitWindowSeconds ?? 0)) window")
+                    Spacer()
+                    statusPills(rateLimit)
                 }
-                if let secondary = rateLimit?.secondaryWindow {
-                    Divider()
-                        .overlay(Color.primary.opacity(0.06))
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(Int((remainingFraction(window) * 100).rounded()))%")
+                        .font(.system(size: 34, weight: .medium))
+                        .tracking(-1)
+                        .monospacedDigit()
+                    Text("remaining")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.secondary)
+                    Spacer(minLength: 8)
+                    Text("\(Int(window.usedPercent.rounded()))% used")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.secondary)
+                        .monospacedDigit()
+                }
+                UsageBar(usedFraction: window.usedPercent / 100)
+                resetDetails(window)
+                if rateLimit?.primaryWindow != nil, let secondary = rateLimit?.secondaryWindow {
+                    Divider().overlay(Palette.border)
                     compactWindowRow(title: WindowLabels.length(secondary.limitWindowSeconds ?? 0), window: secondary)
                 }
             }
         } else if let rateLimit, rateLimit.limitReached == true || rateLimit.allowed == false {
             Card {
-                statusPills(rateLimit)
+                HStack {
+                    SectionTitle(text: "Usage limits")
+                    Spacer()
+                    statusPills(rateLimit)
+                }
             }
         }
     }
 
-    private func heroWindowDetails(_ window: RateWindow, rateLimit: RateLimit?) -> some View {
-        let reset = windowReset(window.resetAt)
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text("\(WindowLabels.length(window.limitWindowSeconds ?? 0).uppercased()) WINDOW")
-                    .font(.caption.weight(.semibold))
-                    .kerning(0.5)
-                    .foregroundStyle(.secondary)
-                statusPills(rateLimit)
-            }
-            if let reset {
+    @ViewBuilder
+    private func resetDetails(_ window: RateWindow) -> some View {
+        if let reset = windowReset(window.resetAt) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(reset.relative.map { "Resets in \($0)" } ?? "Window just reset")
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                HStack(spacing: 5) {
-                    Image(systemName: "clock")
-                        .font(.caption2)
-                    Text("\(DateFormatters.dateTime.string(from: reset.date)) · \(Int(window.usedPercent.rounded()))% used")
-                        .font(.caption)
-                }
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .lineLimit(1)
-            } else {
-                Text("\(Int(window.usedPercent.rounded()))% used")
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
+                    .foregroundStyle(Palette.secondary)
+                Spacer(minLength: 0)
+                Text(DateFormatters.dateTime.string(from: reset.date))
+                    .foregroundStyle(Palette.muted)
             }
+            .font(.system(size: 11))
+            .monospacedDigit()
         }
     }
 
     @ViewBuilder
     private func statusPills(_ rateLimit: RateLimit?) -> some View {
         if rateLimit?.limitReached == true {
-            pill("Limit reached", color: .red, icon: "exclamationmark.octagon.fill")
+            pill("Limit reached", color: Palette.red, icon: "exclamationmark.octagon.fill")
         } else if rateLimit?.allowed == false {
-            pill("Not allowed", color: .orange, icon: "pause.circle.fill")
+            pill("Not allowed", color: Palette.orange, icon: "pause.circle.fill")
         }
     }
 
     private func pill(_ text: String, color: Color, icon: String) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 9))
             Text(text)
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 10, weight: .medium))
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 2.5)
-        .background(color.opacity(0.15), in: Capsule())
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
         .foregroundStyle(color)
     }
 
-    @ViewBuilder
     private func compactWindowRow(title: String, window: RateWindow) -> some View {
-        let reset = windowReset(window.resetAt)
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(title) window")
-                    .font(.callout.weight(.medium))
+                    .font(.system(size: 12))
                 Spacer()
                 Text("\(Int(window.usedPercent.rounded()))% used")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.secondary)
                     .monospacedDigit()
             }
             UsageBar(usedFraction: window.usedPercent / 100)
-            if let reset {
-                Text(reset.relative.map { "Resets in \($0) · \(DateFormatters.dateTime.string(from: reset.date))" }
-                    ?? "Reset \(DateFormatters.dateTime.string(from: reset.date))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
+            resetDetails(window)
         }
     }
 
-    @ViewBuilder
     private func additionalLimitsSection(_ limits: [AdditionalRateLimit]) -> some View {
         Card {
             SectionTitle(text: "Additional limits")
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 ForEach(limits.indices, id: \.self) { index in
                     let limit = limits[index]
                     if let window = limit.rateLimit?.primaryWindow {
@@ -226,11 +213,10 @@ struct UsageView: View {
         }
     }
 
-    @ViewBuilder
     private func modelsSection(_ models: [String: ModelAvailability]) -> some View {
         Card {
             SectionTitle(text: "Models")
-            VStack(spacing: 11) {
+            VStack(spacing: 12) {
                 ForEach(models.keys.sorted(), id: \.self) { name in
                     modelRow(name: name, availability: models[name])
                 }
@@ -239,67 +225,68 @@ struct UsageView: View {
     }
 
     private func modelRow(name: String, availability: ModelAvailability?) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if let availability {
                 Circle()
                     .fill(modelStatusColor(availability))
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
             }
             Text(name)
-                .font(.callout)
+                .font(.system(size: 12, design: .monospaced))
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer()
             if let availability {
                 Text(modelStatusText(availability))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.secondary)
             }
         }
     }
 
     private func modelStatusColor(_ availability: ModelAvailability) -> Color {
         if availability.available == true {
-            return .green
+            return Palette.green
         }
         if availability.creditsWouldEnable == true {
-            return .orange
+            return Palette.orange
         }
-        return .red
+        return Palette.red
     }
 
     private func modelStatusText(_ availability: ModelAvailability) -> String {
         if availability.available == true {
-            return "available"
+            return "Available"
         }
         if availability.creditsWouldEnable == true {
-            return "credits would enable"
+            return "Credits would enable"
         }
-        return "unavailable"
+        return "Unavailable"
     }
 
     private func creditsCard(_ credits: CreditDetails) -> some View {
         Card {
             SectionTitle(text: "Credits")
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if credits.unlimited {
                         Text("Unlimited")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .font(.system(size: 28, weight: .medium))
                     } else if let balance = credits.balance {
                         Text(balance.formatted(.number.precision(.fractionLength(0...2))))
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(.system(size: 28, weight: .medium))
+                            .tracking(-0.5)
                             .monospacedDigit()
                         Text("credits")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.secondary)
                     }
                 }
                 if let caption = creditsApproximation(credits) {
                     Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -331,16 +318,18 @@ struct UsageView: View {
                     SectionTitle(text: "Free resets")
                     Spacer()
                     Text("\(count) available")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.secondary)
                 }
-                VStack(spacing: 0) {
-                    ForEach(credits.prefix(3), id: \.stableID) { credit in
-                        Divider()
-                            .overlay(Color.primary.opacity(0.05))
-                        resetRow(credit)
-                            .padding(.vertical, 8)
+                if !credits.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(credits.prefix(3), id: \.stableID) { credit in
+                            Divider().overlay(Palette.border)
+                            resetRow(credit)
+                                .padding(.vertical, 10)
+                        }
                     }
+                    .padding(.bottom, -4)
                 }
             }
         }
@@ -349,14 +338,14 @@ struct UsageView: View {
     private func resetRow(_ credit: ResetCredit) -> some View {
         HStack(spacing: 10) {
             Text(credit.title ?? "Rate limit reset")
-                .font(.callout.weight(.medium))
+                .font(.system(size: 12))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer()
             if let expires = credit.expiresAt {
-                Text("expires \(DateFormatters.short.string(from: expires))")
-                    .font(.caption)
-                    .foregroundStyle(expires.timeIntervalSinceNow < 7 * 24 * 60 * 60 ? Color.orange : Color.secondary)
+                Text("Expires \(DateFormatters.short.string(from: expires))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(expires.timeIntervalSinceNow < 7 * 24 * 60 * 60 ? Palette.orange : Palette.secondary)
                     .monospacedDigit()
             }
         }
@@ -365,21 +354,21 @@ struct UsageView: View {
     private func spendLimitCard(_ limit: SpendControlLimit) -> some View {
         Card {
             SectionTitle(text: "Spend limit")
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 7) {
                 if let used = limit.used, let cap = limit.limit {
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("\(used.formatted(.number.precision(.fractionLength(0...2)))) / \(cap.formatted(.number.precision(.fractionLength(0...2))))")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(.system(size: 24, weight: .medium))
                             .monospacedDigit()
                         Text("limit")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.secondary)
                     }
                 }
                 if let caption = spendLimitCaption(limit) {
                     Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.secondary)
                 }
             }
         }
@@ -400,53 +389,59 @@ struct UsageView: View {
         HStack(spacing: 8) {
             if let fetchedAt = model.fetchedAt {
                 Text("Updated \(DateFormatters.time.string(from: fetchedAt))")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.muted)
             }
             Spacer()
             Button {
                 Task { await model.refresh() }
             } label: {
-                if model.isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                        .labelStyle(.titleAndIcon)
+                HStack(spacing: 6) {
+                    if model.isLoading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .frame(width: 12, height: 12)
+                    }
+                    Text("Refresh")
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(ConsoleButtonStyle())
             .keyboardShortcut("r", modifiers: .command)
             .disabled(model.isLoading)
         }
     }
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             ProgressView()
+                .controlSize(.small)
             Text("Loading usage…")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
     }
 
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.octagon.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(.red.opacity(0.85))
+            Image(systemName: "exclamationmark.octagon")
+                .font(.system(size: 28))
+                .foregroundStyle(Palette.red)
+            Text("Unable to load usage")
+                .font(.system(size: 15, weight: .medium))
             Text(message)
-                .font(.callout)
+                .font(.system(size: 12))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondary)
                 .textSelection(.enabled)
-            Button("Try Again") {
+            Button("Try again") {
                 Task { await model.refresh() }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .buttonStyle(ConsoleButtonStyle())
+            .disabled(model.isLoading)
         }
         .padding(24)
         .frame(maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
@@ -488,25 +483,36 @@ struct UsageView: View {
 }
 
 private enum Metric {
-    static let cardRadius: CGFloat = 14
+    static let cardRadius: CGFloat = 7
+}
+
+private enum Palette {
+    static let background = Color(white: 0.075)
+    static let card = Color(white: 0.13)
+    static let raised = Color(white: 0.17)
+    static let border = Color(white: 0.21)
+    static let track = Color(white: 0.32)
+    static let text = Color(white: 0.93)
+    static let secondary = Color(white: 0.62)
+    static let muted = Color(white: 0.48)
+    static let green = Color(red: 0.57, green: 0.81, blue: 0.61)
+    static let orange = Color(red: 0.88, green: 0.65, blue: 0.40)
+    static let red = Color(red: 0.93, green: 0.49, blue: 0.46)
 }
 
 struct Card<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             content
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color.primary.opacity(0.045),
-            in: RoundedRectangle(cornerRadius: Metric.cardRadius, style: .continuous)
-        )
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: Metric.cardRadius))
         .overlay(
-            RoundedRectangle(cornerRadius: Metric.cardRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Metric.cardRadius)
+                .strokeBorder(Palette.border, lineWidth: 1)
         )
     }
 }
@@ -516,44 +522,29 @@ struct SectionTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
-            .kerning(0.5)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Palette.text)
     }
 }
 
-struct RingView<Label: View>: View {
-    let fraction: Double
-    var size: CGFloat = 76
-    var lineWidth: CGFloat = 5.5
-    @ViewBuilder var label: Label
+private struct ConsoleButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovered = false
 
-    var body: some View {
-        let clamped = min(max(fraction, 0), 1)
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.08), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: clamped)
-                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            label
-        }
-        .padding(lineWidth / 2)
-        .frame(width: size, height: size)
-        .animation(.easeOut(duration: 0.5), value: clamped)
-    }
-
-    private var tint: Color {
-        let remaining = min(max(fraction, 0), 1)
-        if remaining >= 0.3 {
-            return .green
-        }
-        if remaining >= 0.1 {
-            return .orange
-        }
-        return .red
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12))
+            .foregroundStyle(Palette.text)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                isEnabled && (isHovered || configuration.isPressed) ? Palette.border : Palette.raised,
+                in: RoundedRectangle(cornerRadius: 5)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Palette.border))
+            .contentShape(RoundedRectangle(cornerRadius: 5))
+            .opacity(isEnabled ? 1 : 0.5)
+            .onHover { isHovered = $0 }
     }
 }
 
@@ -563,27 +554,31 @@ struct UsageBar: View {
     var body: some View {
         let fraction = min(max(usedFraction, 0), 1)
         GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.08))
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(geo.size.width * fraction, fraction > 0 ? 5 : 0))
+            HStack(spacing: 3) {
+                if fraction > 0 {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(tint)
+                        .frame(width: max((geo.size.width - (fraction < 1 ? 3 : 0)) * fraction, 3))
+                }
+                if fraction < 1 {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Palette.track)
+                }
             }
         }
         .frame(height: 6)
-        .animation(.easeOut(duration: 0.5), value: fraction)
+        .accessibilityHidden(true)
     }
 
     private var tint: Color {
-        let remaining = 1 - min(max(usedFraction, 0), 1)
-        if remaining >= 0.3 {
-            return .green
+        let used = min(max(usedFraction, 0), 1)
+        if used <= 0.7 {
+            return Palette.green
         }
-        if remaining >= 0.1 {
-            return .orange
+        if used <= 0.9 {
+            return Palette.orange
         }
-        return .red
+        return Palette.red
     }
 }
 
