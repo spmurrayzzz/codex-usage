@@ -336,17 +336,19 @@ struct UsageView: View {
     }
 
     private func resetRow(_ credit: ResetCredit) -> some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(credit.title ?? "Rate limit reset")
                 .font(.system(size: 12))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Spacer()
+            Spacer(minLength: 0)
             if let expires = credit.expiresAt {
-                Text("Expires \(DateFormatters.short.string(from: expires))")
+                Text("Expires \(DateFormatters.expiration.string(from: expires))")
                     .font(.system(size: 11))
                     .foregroundStyle(expires.timeIntervalSinceNow < 7 * 24 * 60 * 60 ? Palette.orange : Palette.secondary)
                     .monospacedDigit()
+                    .fixedSize()
+                    .help(expires.formatted(date: .long, time: .complete))
             }
         }
     }
@@ -662,9 +664,10 @@ enum DateFormatters {
         return formatter
     }()
 
-    static let short: DateFormatter = {
+    static let expiration: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("MMMdjmz")
         return formatter
     }()
 }
